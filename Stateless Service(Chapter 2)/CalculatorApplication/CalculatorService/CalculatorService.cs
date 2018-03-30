@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Fabric;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
-using Microsoft.ServiceFabric.Services.Remoting.Runtime;
+using Microsoft.ServiceFabric.Services.Communication.Wcf.Runtime;
+using System.ServiceModel;
 
 namespace CalculatorService
 {
@@ -21,12 +21,12 @@ namespace CalculatorService
 
         public Task<string> Add(int a, int b)
         {
-            return Task.FromResult<string>(string.Format("Instance {0} returns : {1}", Context.InstanceId, a + b));
+            return Task.FromResult<string>(string.Format($"Instance {Context.InstanceId} returns {a + b}"));
         }
 
         public Task<string> Subtract(int a, int b)
-        { 
-            return Task.FromResult<string>(string.Format("Instance {0} returns: {1}",Context.InstanceId, a + b));
+        {
+            return Task.FromResult<string>(string.Format($"Instance {Context.InstanceId} returns {a + b}"));
         }
 
         /// <summary>
@@ -35,9 +35,30 @@ namespace CalculatorService
         /// <returns>A collection of listeners.</returns>
         protected override IEnumerable<ServiceInstanceListener> CreateServiceInstanceListeners()
         {
-            return this.CreateServiceRemotingInstanceListeners();
-            
+            return new[] {
+                new ServiceInstanceListener(    
+                    (context) =>  new WcfCommunicationListener<ICalculatorService>(context,this,CreateListenBinding(),"ServiceEndPoint"))
+            };
         }
+  
+
+        private NetTcpBinding CreateListenBinding()
+        {
+            NetTcpBinding binding = new NetTcpBinding(SecurityMode.None)
+            {
+                SendTimeout = TimeSpan.MaxValue,
+                ReceiveTimeout = TimeSpan.MaxValue,
+                OpenTimeout = TimeSpan.FromSeconds(5),
+                CloseTimeout = TimeSpan.FromSeconds(5),
+                MaxConnections = int.MaxValue,
+                MaxReceivedMessageSize = 1024 * 1024
+            };
+            binding.MaxBufferSize = (int)binding.MaxReceivedMessageSize;
+            binding.MaxBufferPoolSize = Environment.ProcessorCount * binding.MaxReceivedMessageSize;
+
+            return binding;
+        }
+    
 
         /// <summary>
         /// This is the main entry point for your service instance.
